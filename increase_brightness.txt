@@ -1,3 +1,149 @@
 .data
+    # File locations
+    input_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\Images\\house_64_in_ascii_lf.ppm"
+    output_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\ArchAssignment\\testing\\output.txt"
+
+    # Constants
+    MAX_PIXEL_VALUE: .word 255
+
+    # Buffers
+    buffer: .space 64
+    output_buffer: .space 64
+
+    # Variables
+    initial_sum: .word 0
+    final_sum: .word 0
+    pixel_count: .word 0
+
+    # Messages
+    initial_avg: .asciiz "Average pixel value of the original image:\n"
+    final_avg: .asciiz "Average pixel value of the new image:\n"
+    newline: .asciiz "\n"
+
 .text
 .globl main
+
+main:
+
+    # Open the input file for reading
+    li $v0, 13               # syscall code for open
+    la $a0, input_file       # load the address of the input file
+    li $a1, 0                # open for reading
+    li $a2, 0                # mode is ignored
+    syscall
+    move $s0, $v0           # store file descriptor in $s0
+
+    # Read and process the image
+    jal process_image
+
+    # Close the input file
+    li $v0, 16               # syscall code for close
+    move $a0, $s0            # file descriptor (input file)
+    syscall
+
+    # Open the output file for writing
+    li $v0, 13               # syscall code for open
+    la $a0, output_file      # load the address of the output file
+    li $a1, 1                # open for writing (create if it doesn't exist)
+    li $a2, 0                # mode is ignored
+    syscall
+    move $s0, $v0           # store file descriptor in $s0
+
+    # Write the processed image to the output file
+    jal write_output
+
+    # Close the output file
+    li $v0, 16               # syscall code for close
+    move $a0, $s0            # file descriptor (output file)
+    syscall
+
+    # Calculate and display average RGB values
+    jal calculate_average
+
+    # Exit the program
+    li $v0, 10               # syscall code for exit
+    syscall
+
+process_image:
+    # Initialize variables
+    li $t0, 0                # Initialize buffer index
+    li $t1, 0                # Initialize output buffer index
+    li $t2, 0                # Initialize pixel value sum
+
+    read_pixel:
+    lb $t3, 0($t0)           # Load byte from input buffer
+    beqz $t3, end_of_file    # Check for end of file
+
+    addi $t2, $t2, 1         # Increment pixel count
+
+    # Increase brightness by 10 (with a maximum of 255)
+    addi $t3, $t3, 10
+    bgtz $t3, clamp_value    # Check for overflow
+
+    end_of_file:
+    # Calculate the average brightness
+    beqz $t2, skip_average    # Avoid division by zero
+    divu $t3, $t2, $s3       # Calculate average RGB value
+
+    skip_average:
+    # Store the updated pixel value
+    sb $t3, 0($t1)           # Store byte in output buffer
+
+    # Move to the next pixel
+    addi $t0, $t0, 1         # Increment input buffer index
+    addi $t1, $t1, 1         # Increment output buffer index
+
+    j read_pixel
+
+clamp_value:
+    # Clamp the value to 255
+    li $t3, 255
+    sb $t3, 0($t1)           # Store byte in output buffer
+    j end_of_file
+
+write_output:
+    # Write the output buffer to the output file
+    li $v0, 15               # syscall code for write
+    move $a0, $s0            # file descriptor (output file)
+    la $a1, output_buffer    # load the address of the output buffer
+    li $a2, 64               # number of characters to write
+    syscall
+
+    jr $ra
+
+calculate_average:
+    # Calculate the average RGB values
+    lw $s1, initial_sum       # Load initial sum from memory
+    lw $s2, final_sum         # Load final sum from memory
+    lw $s3, pixel_count       # Load pixel count from memory
+
+    divu $s4, $s1, $s3        # Calculate initial average
+    divu $s5, $s2, $s3        # Calculate final average
+
+    # Convert averages to floating-point
+    mtc1 $s4, $f4             # Move initial average to $f4
+    mtc1 $s5, $f5             # Move final average to $f5
+
+    # Display the average RGB values
+    li $v0, 4                # syscall code for print string
+    la $a0, initial_avg      # Load address of initial_avg
+    syscall
+    li $v0, 2                # syscall code for print float
+    mov.s $f12, $f4          # Move initial average to $f12
+    syscall
+
+    li $v0, 4                # syscall code for print string
+    la $a0, newline          # Load address of newline
+    syscall
+
+    li $v0, 4                # syscall code for print string
+    la $a0, final_avg        # Load address of final_avg
+    syscall
+    li $v0, 2                # syscall code for print float
+    mov.s $f12, $f5          # Move final average to $f12
+    syscall
+
+    jr $ra
+
+end_of_file:
+    jr $ra
