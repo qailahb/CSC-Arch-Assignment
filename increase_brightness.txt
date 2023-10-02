@@ -2,148 +2,265 @@
     # File locations
     input_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\Images\\house_64_in_ascii_lf.ppm"
     output_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\ArchAssignment\\testing\\output.txt"
-
-    # Constants
-    MAX_PIXEL_VALUE: .word 255
-
-    # Buffers
-    buffer: .space 64
-    output_buffer: .space 64
-
-    # Variables
-    initial_sum: .word 0
-    final_sum: .word 0
-    pixel_count: .word 0
-
-    # Messages
-    initial_avg: .asciiz "Average pixel value of the original image:\n"
-    final_avg: .asciiz "Average pixel value of the new image:\n"
-    newline: .asciiz "\n"
+    buffer: .space 256     # Buffer to store a line from the file
 
 .text
 .globl main
 
 main:
-
     # Open the input file for reading
-    li $v0, 13               # syscall code for open
-    la $a0, input_file       # load the address of the input file
-    li $a1, 0                # open for reading
-    li $a2, 0                # mode is ignored
-    syscall
-    move $s0, $v0           # store file descriptor in $s0
-
-    # Read and process the image
-    jal process_image
-
-    # Close the input file
-    li $v0, 16               # syscall code for close
-    move $a0, $s0            # file descriptor (input file)
+    li $v0, 13           # Service code for open file (read mode)
+    la $a0, input_file
+    li $a1, 0            # File mode (read)
     syscall
 
-    # Open the output file for writing
-    li $v0, 13               # syscall code for open
-    la $a0, output_file      # load the address of the output file
-    li $a1, 1                # open for writing (create if it doesn't exist)
-    li $a2, 0                # mode is ignored
-    syscall
-    move $s0, $v0           # store file descriptor in $s0
+    move $s0, $v0        # Store the file descriptor in $s0
 
-    # Write the processed image to the output file
-    jal write_output
-
-    # Close the output file
-    li $v0, 16               # syscall code for close
-    move $a0, $s0            # file descriptor (output file)
+    # Create the output file for writing
+    li $v0, 13           # Service code for open file (write mode)
+    la $a0, output_file
+    li $a1, 1            # File mode (write)
     syscall
 
-    # Calculate and display average RGB values
-    jal calculate_average
+    move $s1, $v0        # Store the file descriptor in $s1
 
-    # Exit the program
-    li $v0, 10               # syscall code for exit
-    syscall
+    # Read and parse the header information
+    jal read_header
 
-process_image:
     # Initialize variables
-    li $t0, 0                # Initialize buffer index
-    li $t1, 0                # Initialize output buffer index
-    li $t2, 0                # Initialize pixel value sum
+    li $t0, 0            # Total red value
+    li $t1, 0            # Total green value
+    li $t2, 0            # Total blue value
 
-    read_pixel:
-    lb $t3, 0($t0)           # Load byte from input buffer
-    beqz $t3, end_of_file    # Check for end of file
+    # Loop through each pixel
+    li $t3, 0            # Pixel counter
 
-    addi $t2, $t2, 1         # Increment pixel count
+pixel_loop:
+    # Read RGB values from the input file
+    jal read_pixel
 
-    # Increase brightness by 10 (with a maximum of 255)
-    addi $t3, $t3, 10
-    bgtz $t3, clamp_value    # Check for overflow
+    # Increase brightness by 10 and clamp to 255
+    addi $t4, $t4, 10    # Increase red value by 10
+    addi $t5, $t5, 10    # Increase green value by 10
+    addi $t6, $t6, 10    # Increase blue value by 10
 
-    end_of_file:
-    # Calculate the average brightness
-    beqz $t2, skip_average    # Avoid division by zero
-    divu $t3, $t2, $s3       # Calculate average RGB value
+    # Clamp values to 255
+    li $t7, 255
+    min $t4, $t4, $t7    # Clamp red value
+    min $t5, $t5, $t7    # Clamp green value
+    min $t6, $t6, $t7    # Clamp blue value
 
-    skip_average:
-    # Store the updated pixel value
-    sb $t3, 0($t1)           # Store byte in output buffer
+    # Write the updated RGB values to the output file
+    jal write_pixel
 
-    # Move to the next pixel
-    addi $t0, $t0, 1         # Increment input buffer index
-    addi $t1, $t1, 1         # Increment output buffer index
+    # Update total RGB values for averaging
+    add $t0, $t0, $t4
+    add $t1, $t1, $t5
+    add $t2, $t2, $t6
 
-    j read_pixel
+    # Check if we've processed all pixels
+    li $t7, 4096          # Total number of pixels (64x64)
+    beq $t3, $t7, done    # If done, exit loop
 
-clamp_value:
-    # Clamp the value to 255
-    li $t3, 255
-    sb $t3, 0($t1)           # Store byte in output buffer
-    j end_of_file
+    # Increment pixel counter and continue loop
+    addi $t3, $t3, 1
+    j pixel_loop
 
-write_output:
-    # Write the output buffer to the output file
-    li $v0, 15               # syscall code for write
-    move $a0, $s0            # file descriptor (output file)
-    la $a1, output_buffer    # load the address of the output buffer
-    li $a2, 64               # number of characters to write
+done:
+    # Calculate average RGB values
+    li $t7, 4096          # Total number of pixels (64x64)
+    div $t0, $t7          # Average red value
+    mflo $t0
+
+    div $t1, $t7          # Average green value
+    mflo $t1
+
+    div $t2, $t7          # Average blue value
+    mflo $t2
+
+    # Convert average RGB values to double values
+    mtc1 $t0, $f0   # Convert average red value to double
+    mtc1 $t1, $f1   # Convert average green value to double
+    mtc1 $t2, $f2   # Convert average blue value to double
+
+    # Display average pixel values
+    li $v0, 2       # Print float (f12: red, f13: green, f14: blue)
     syscall
 
+    # Close input and output files
+    li $v0, 16            # Service code for close file
+    move $a0, $s0         # File descriptor of input file
+    syscall
+
+    move $a0, $s1         # File descriptor of output file
+    syscall
+
+    # Exit program
+    li $v0, 10            # Service code for program exit
+    syscall
+
+read_header:
+    # Initialize variables
+    li $t4, 0            # Width (number of columns)
+    li $t5, 0            # Height (number of rows)
+    li $t6, 0            # Max value
+
+read_header_loop:
+    # Read a line from the input file
+    li $v0, 14           # Service code for read string (from file descriptor)
+    move $a0, $s0        # Input file descriptor
+    la $a1, buffer       # Buffer to store the line
+    li $a2, 256          # Maximum line length
+    syscall
+
+    # Check if the line is a comment (starts with '#')
+    lb $t7, buffer      # Load the first character of the line
+    beq $t7, 35, skip_comment  # '#' character, skip comment
+
+    # Parse the line for header information
+    # Example header lines: "64 64" (width and height), "255" (max value)
+    # Assumes no leading/trailing whitespace in the lines
+
+    # Try to read width and height (first line)
+    beq $t4, 0, read_dimensions
+    beq $t4, 1, read_max_value
+    j header_done
+
+read_dimensions:
+    # Parse width and height
+    li $t4, 1            # Set $t4 to 1 to indicate that we are reading dimensions
+
+    j read_header_loop
+
+read_max_value:
+    # Parse max value
+    j read_header_loop
+
+skip_comment:
+    # Skip lines starting with '#' (comments)
+    j read_header_loop
+
+header_done:
+    # Return to calling code
     jr $ra
 
-calculate_average:
-    # Calculate the average RGB values
-    lw $s1, initial_sum       # Load initial sum from memory
-    lw $s2, final_sum         # Load final sum from memory
-    lw $s3, pixel_count       # Load pixel count from memory
-
-    divu $s4, $s1, $s3        # Calculate initial average
-    divu $s5, $s2, $s3        # Calculate final average
-
-    # Convert averages to floating-point
-    mtc1 $s4, $f4             # Move initial average to $f4
-    mtc1 $s5, $f5             # Move final average to $f5
-
-    # Display the average RGB values
-    li $v0, 4                # syscall code for print string
-    la $a0, initial_avg      # Load address of initial_avg
-    syscall
-    li $v0, 2                # syscall code for print float
-    mov.s $f12, $f4          # Move initial average to $f12
+read_pixel:
+    # Read R, G, B values from the input file
+    li $v0, 14           # Service code for read string (from file descriptor)
+    move $a0, $s0        # Input file descriptor
+    la $a1, buffer       # Buffer to store the line
+    li $a2, 256          # Maximum line length
     syscall
 
-    li $v0, 4                # syscall code for print string
-    la $a0, newline          # Load address of newline
-    syscall
+    # Parse the line for RGB values
+    li $t4, 0            # Initialize R value
+    li $t5, 0            # Initialize G value
+    li $t6, 0            # Initialize B value
+    li $t8, 0            # Initialize counter for digit position (0: R, 1: G, 2: B)
+read_pixel_loop:
+    lb $t7, buffer($t8)  # Load a character from the buffer
+    beqz $t7, pixel_parsed  # If null terminator is reached, exit loop
 
-    li $v0, 4                # syscall code for print string
-    la $a0, final_avg        # Load address of final_avg
-    syscall
-    li $v0, 2                # syscall code for print float
-    mov.s $f12, $f5          # Move final average to $f12
-    syscall
+    # Convert the character to an integer and update the RGB value
+    sub $t7, $t7, 48     # Convert ASCII character to integer ('0' to 0, '1' to 1, etc.)
+    beq $t8, 0, update_r
+    beq $t8, 1, update_g
+    beq $t8, 2, update_b
+    j read_pixel_loop
 
+update_r:
+    mul $t4, $t4, 10     # Multiply current R value by 10
+    add $t4, $t4, $t7    # Add the new digit to R
+    j read_pixel_loop
+
+update_g:
+    mul $t5, $t5, 10     # Multiply current G value by 10
+    add $t5, $t5, $t7    # Add the new digit to G
+    j read_pixel_loop
+
+update_b:
+    mul $t6, $t6, 10     # Multiply current B value by 10
+    add $t6, $t6, $t7    # Add the new digit to B
+    j read_pixel_loop
+
+pixel_parsed:
+    # Return to calling code
     jr $ra
 
-end_of_file:
+write_pixel:
+    # Convert and format R, G, B values to a string
+    move $a0, $t4        # R value
+    move $a1, $t5        # G value
+    move $a2, $t6        # B value
+    jal int_to_string
+
+    # Write the formatted RGB string to the output file
+    move $a0, $s1        # Output file descriptor
+    move $a1, $t7        # Address of the RGB string
+    li $v0, 4            # Service code for print string (to file descriptor)
+    syscall
+
+    # Write a newline character to separate pixels
+    li $v0, 11           # Service code for print character
+    li $a0, 10           # ASCII code for newline character
+    syscall
+
+    # Return to calling code
+    jr $ra
+
+# Function to convert an integer to a string
+# Expects integer in $a0, and stores the resulting string in $a1
+int_to_string:
+    # Initialize variables
+    li $t8, 10            # Base 10
+    move $t9, $a0         # Copy the integer to $t9
+    li $t0, 0             # Initialize string index
+
+int_to_string_loop:
+    # Calculate the remainder (digit) when dividing by 10
+    div $t9, $t8
+    mfhi $t1              # Remainder (digit) in $t1
+
+    # Convert the digit to ASCII and store it in the string
+    addi $t1, $t1, 48     # Convert digit to ASCII ('0' to 0, '1' to 1, etc.)
+    sb $t1, ($a1)         # Store the digit in the string
+
+    # Increment the string index
+    addi $a1, $a1, 1
+
+    # Check if the quotient is zero (end of conversion)
+    beqz $t9, int_to_string_done
+
+    # Update the quotient for the next iteration
+    move $t9, $t0
+
+    j int_to_string_loop
+
+int_to_string_done:
+    # Null-terminate the string
+    li $t2, 0
+    sb $t2, ($a1)
+
+    # Reverse the string in place
+    move $t3, $a1         # $t3 points to the end of the string
+    subi $t3, $t3, 1      # Point to the last character
+
+int_to_string_reverse_loop:
+    # Swap characters at $t1 and $t3
+    lb $t1, ($a1)
+    lb $t4, ($t3)
+    sb $t4, ($a1)
+    sb $t1, ($t3)
+
+    # Move pointers inward
+    addi $a1, $a1, 1
+    subi $t3, $t3, 1
+
+    # Check if we've reached the middle of the string
+    beq $a1, $t3, int_to_string_reverse_done
+
+    j int_to_string_reverse_loop
+
+int_to_string_reverse_done:
+    # Return to calling code
     jr $ra
