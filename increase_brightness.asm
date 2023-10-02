@@ -1,10 +1,11 @@
 .data
     # File locations
-    input_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\Images\\house_64_in_ascii_lf.ppm"
-    output_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\ArchAssignment\\testing\\output.txt"
+    input_file: .asciiz "C:\\Users\\qaila\\Downloads\\BHMQAI001_Arch\\Images\\house_64_in_ascii_lf.ppm"
+    output_file: .asciiz "C:\\Users\\qaila\\Downloads\\BHMQAI001_Arch\\output.txt"
     buffer:  .space 256     # Stores line from the file
 
 .text
+
 .globl main
 
 main:
@@ -37,7 +38,7 @@ main:
 pixel_loop:
     jal read_pixel	# Reads RGB values from input_file
 
-    # Increases brightness for each clour value by 10
+    # Increases brightness for each colour value by 10
     addi $t4, $t4, 10    # Red
     addi $t5, $t5, 10    # Green
     addi $t6, $t6, 10    # Blue
@@ -133,14 +134,14 @@ header_exit:
     jr $ra
 
 read_pixel:
-    # Read R, G, B values from the input file
+    # Reads RGB values from input_file
     li $v0, 14           # Reads string
     move $a0, $s0        
     la $a1, buffer       # Stores line
     li $a2, 256          # Max line length
     syscall
 
-    # Parse the line for RGB values
+    # Runs through line for RGB values
     li $t4, 0            # Red value
     li $t5, 0            # Green value
     li $t6, 0            # Blue value
@@ -170,20 +171,20 @@ update_green:
 
 update_blue:
     mul $t6, $t6, 10     # Multiply by 10
-    add $t6, $t6, $t7    # Updatr
+    add $t6, $t6, $t7    # Update
     j read_pixel_loop
 
 #pixel_runthrough:
 #   jr $ra
 
 write_pixel:
-    # Convert and format R, G, B values to a string
+    # Convert RGB values to string
     move $a0, $t4        # R value
     move $a1, $t5        # G value
     move $a2, $t6        # B value
     jal int_to_string
 
-    # Write the formatted RGB string to the output file
+    # Writes RGB string to output_file
     move $a0, $s1        
     move $a1, $t7        # Stores RGB string
 
@@ -199,7 +200,7 @@ write_pixel:
 
 # Conversion of int to string
 int_to_string:
-    # Initialize variables
+    # Initialise variables
     li $t8, 10            
     move $t9, $a0         
     li $t0, 0             
@@ -230,7 +231,7 @@ int_to_string_exit:
     addi $t3, $t3, -1      
 
 int_to_string_reverse_loop:
-    # Reverses order of characters for display
+    # Reverses order of characters in string for display
     lb $t1, ($a1)
     lb $t4, ($t3)
     sb $t4, ($a1)

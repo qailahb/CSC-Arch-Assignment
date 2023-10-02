@@ -1,15 +1,15 @@
 .data
-    	input_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\Images\\house_64_in_ascii_lf.ppm"
-    	output_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\ArchAssignment\\testing\\output.ppm"
+    	input_file: .asciiz "C:\\Users\\qaila\\Downloads\\BHMQAI001_Arch\\Images\\house_64_in_ascii_lf.ppm"
+    	output_file: .asciiz "C:\\Users\\qaila\\Downloads\\BHMQAI001_Arch\\output.ppm"
     	buffer: .space 256     # Stores line from the file
 	p2_header:  .asciiz "P2\n"  # P2 format header
-	#buffer2: .space 256
+	#buffer2: .space 500
 
 .text
 .globl main
 
 main:
-    # Open the input file for reading
+    # Opens input_file
     li $v0, 13           # Opens file
     la $a0, input_file
     li $a1, 0            
@@ -17,7 +17,7 @@ main:
 
     move $s0, $v0        # Stores in $s0
 
-    # Create the output file for writing
+    # Opens output file
     li $v0, 13           # Opens file
     la $a0, output_file
     li $a1, 1            
@@ -43,22 +43,22 @@ main:
     syscall
 
     # Exit program
-    li $v0, 10            # Service code for program exit
+    li $v0, 10            
     syscall
 
-# Function to read and parse the header of the PPM file
+# Reads header of input_file
 read_header:
-    # Initialize variables
+    # Initialises variables
     li $t4, 0            # Stores columns
     li $t5, 0            #  Stores rows
     li $t6, 0            # Stores max value
 
 read_header_loop:
-    # Read a line from the input file
+    # Reads line from input_file
     li $v0, 14           # Read
     move $a0, $s0        
     la $a1, buffer       # Stores read line into buffer
-     li $a2, 256          # Max length ofline 
+     li $a2, 256         # Max length ofline 
     syscall
 
     lb $t7, buffer      # Loads first letter of line
@@ -79,12 +79,11 @@ read_max_value:
     j read_header_loop
 
 header_exit:
-    # Return to calling code
     jr $ra
 
 # Converts RGB values to greyscale 
 convert_to_greyscale:
-    divu $t9, $t9, 3  # Divide by 3 to getaverage
+    divu $t9, $t9, 3  # Divide by 3 to get average
     jr $ra
 
 # Converts pixel values to greyscale
@@ -107,7 +106,7 @@ pixel_loop:
     move $a0, $t9        # Greyscale pixel value
     jal int_to_string
 
-    # Write the greyscale pixel value to the output file
+    # Writes greyscale pixel values to output_file
     li $v0, 4
     move $a0, $s1
     move $a1, $t7
@@ -127,7 +126,7 @@ pixel_loop:
 exit:
     jr $ra
 
-# Runs through RGB values from a line in input_file
+# Runs through RGB values from each line in input_file
 RGB_Runthrough:
     lb $t2, buffer
     lb $t3, buffer+3
@@ -142,6 +141,7 @@ RGB_Runthrough:
     li $t5, 100  # Red
     li $t6, 10   # Green
     li $t7, 1    # Blue
+
 	# Scaling
     mul $t2, $t2, $t5
     mul $t3, $t3, $t6
@@ -153,13 +153,12 @@ RGB_Runthrough:
 
 # Conversion of int to string
 int_to_string:
-    # Initialize variables
+    # Initialise variables
     li $t8, 10            
     move $t9, $a0         
     li $t0, 0 
 
 int_to_string_loop:
-    
     div $t9, $t8
     mfhi $t1         # Remainder stored in $t1
 
