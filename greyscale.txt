@@ -184,7 +184,7 @@ int_to_string_exit:
     addi $t3, $t3, -1      
 
 int_to_string_reverse_loop:
-    # Reverses order of characters for display
+    # Reverses order of characters in string for display
     lb $t1, ($a1)
     lb $t4, ($t3)
     sb $t4, ($a1)

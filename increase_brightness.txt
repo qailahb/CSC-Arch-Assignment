@@ -239,7 +239,7 @@ int_to_string_reverse_loop:
     addi $a1, $a1, 1
     addi $t3, $t3, -1
 
-    beq $a1, $t3, int_to_string_reverse_exit	# Checks for middle of string
+    beq $a1, $t3, int_to_string_reverse_exit	# Checks for  middle of string
     j int_to_string_reverse_loop
 
 int_to_string_reverse_exit:
