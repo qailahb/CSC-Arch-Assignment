@@ -2,190 +2,179 @@
     # File locations
     input_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\Images\\house_64_in_ascii_lf.ppm"
     output_file: .asciiz "C:\\Users\\qaila\\Downloads\\ArchAssignment\\ArchAssignment\\testing\\output.txt"
-    buffer: .space 256     # Buffer to store a line from the file
+    buffer:  .space 256     # Stores line from the file
 
 .text
 .globl main
 
 main:
-    # Open the input file for reading
-    li $v0, 13           # Service code for open file (read mode)
+    # Open input_file 
+    li $v0, 13          # Opens file
     la $a0, input_file
-    li $a1, 0            # File mode (read)
+    li $a1, 0            
     syscall
 
-    move $s0, $v0        # Store the file descriptor in $s0
+    move $s0, $v0       # Stores in $s0
 
-    # Create the output file for writing
-    li $v0, 13           # Service code for open file (write mode)
+    # Opens output_file 
+    li $v0, 13          # Opens file
     la $a0, output_file
-    li $a1, 1            # File mode (write)
+    li $a1, 1            
     syscall
 
-    move $s1, $v0        # Store the file descriptor in $s1
+    move $s1, $v0       # Stores in $s1
 
-    # Read and parse the header information
-    jal read_header
+    jal read_header	# Jumps to function to read header 
 
-    # Initialize variables
-    li $t0, 0            # Total red value
-    li $t1, 0            # Total green value
-    li $t2, 0            # Total blue value
+    # Loads in colour variables
+    li $t0, 0            # Red
+    li $t1, 0            # Green
+    li $t2, 0            # Blue
 
-    # Loop through each pixel
+    # Loops through pixels
     li $t3, 0            # Pixel counter
 
 pixel_loop:
-    # Read RGB values from the input file
-    jal read_pixel
+    jal read_pixel	# Reads RGB values from input_file
 
-    # Increase brightness by 10 and clamp to 255
-    addi $t4, $t4, 10    # Increase red value by 10
-    addi $t5, $t5, 10    # Increase green value by 10
-    addi $t6, $t6, 10    # Increase blue value by 10
+    # Increases brightness for each clour value by 10
+    addi $t4, $t4, 10    # Red
+    addi $t5, $t5, 10    # Green
+    addi $t6, $t6, 10    # Blue
 
-    # Clamp values to 255
+    # Clamps values to 255
     li $t7, 255
-    min $t4, $t4, $t7    # Clamp red value
-    min $t5, $t5, $t7    # Clamp green value
-    min $t6, $t6, $t7    # Clamp blue value
+    slt $t8, $t4, $t7    # Red
+    movn $t4, $t7, $t8   
 
-    # Write the updated RGB values to the output file
-    jal write_pixel
+    slt $t8, $t5, $t7    # Green
+    movn $t5, $t7, $t8   
 
-    # Update total RGB values for averaging
+    slt $t8, $t6, $t7    # Blue
+    movn $t6, $t7, $t8   
+
+    jal write_pixel	 # Write the updated RGB values to the output file
+
+    # Update total colour values
     add $t0, $t0, $t4
     add $t1, $t1, $t5
     add $t2, $t2, $t6
 
     # Check if we've processed all pixels
-    li $t7, 4096          # Total number of pixels (64x64)
-    beq $t3, $t7, done    # If done, exit loop
+    li $t7, 4096          # Total pixels = 64 x 64
+    beq $t3, $t7, exit    # Exit if correct
 
-    # Increment pixel counter and continue loop
-    addi $t3, $t3, 1
+    addi $t3, $t3, 1	  # Increment pixel counter
     j pixel_loop
 
-done:
-    # Calculate average RGB values
-    li $t7, 4096          # Total number of pixels (64x64)
-    div $t0, $t7          # Average red value
+exit:
+    # Averages RGB values
+    li $t7, 4096          # Total pixels = 64 x 64
+    div $t0, $t7          # Average Red value
     mflo $t0
 
-    div $t1, $t7          # Average green value
+    div $t1, $t7          # Average Green value
     mflo $t1
 
-    div $t2, $t7          # Average blue value
+    div $t2, $t7          # Average Blue value
     mflo $t2
 
-    # Convert average RGB values to double values
-    mtc1 $t0, $f0   # Convert average red value to double
-    mtc1 $t1, $f1   # Convert average green value to double
-    mtc1 $t2, $f2   # Convert average blue value to double
+    # Convert averages to type double
+    mtc1 $t0, $f0   # Red
+    mtc1 $t1, $f1   # Green
+    mtc1 $t2, $f2   # Blue
 
-    # Display average pixel values
-    li $v0, 2       # Print float (f12: red, f13: green, f14: blue)
+    li $v0, 2     # Displays averages
+     syscall
+
+    li $v0, 16            # Closes files
+    move $a0, $s0        
+
+    syscall
+    move $a0, $s1         
     syscall
 
-    # Close input and output files
-    li $v0, 16            # Service code for close file
-    move $a0, $s0         # File descriptor of input file
-    syscall
-
-    move $a0, $s1         # File descriptor of output file
-    syscall
-
-    # Exit program
-    li $v0, 10            # Service code for program exit
+    # Exit  program
+    li $v0, 10            # Exit
     syscall
 
 read_header:
-    # Initialize variables
-    li $t4, 0            # Width (number of columns)
-    li $t5, 0            # Height (number of rows)
-    li $t6, 0            # Max value
+    li $t4, 0            # Stores columns
+    li $t5, 0            #  Stores Rows
+    li $t6, 0            # Stores max
 
 read_header_loop:
-    # Read a line from the input file
-    li $v0, 14           # Service code for read string (from file descriptor)
-    move $a0, $s0        # Input file descriptor
-    la $a1, buffer       # Buffer to store the line
-    li $a2, 256          # Maximum line length
+    li $v0, 14           # Read
+     move $a0, $s0       
+    la $a1, buffer       # Stores read line into buffer
+    li $a2, 256          # Max line
+
     syscall
 
-    # Check if the line is a comment (starts with '#')
-    lb $t7, buffer      # Load the first character of the line
-    beq $t7, 35, skip_comment  # '#' character, skip comment
+    lb $t7, buffer      # Loads first letter of line
+    beq $t7, 35, skip_comment  
 
-    # Parse the line for header information
-    # Example header lines: "64 64" (width and height), "255" (max value)
-    # Assumes no leading/trailing whitespace in the lines
-
-    # Try to read width and height (first line)
-    beq $t4, 0, read_dimensions
+    beq $t4, 0, read_dimensions	# Reads dimensions of line
     beq $t4, 1, read_max_value
-    j header_done
+    j header_exit
 
 read_dimensions:
-    # Parse width and height
-    li $t4, 1            # Set $t4 to 1 to indicate that we are reading dimensions
-
+    li $t4, 1            
     j read_header_loop
 
 read_max_value:
-    # Parse max value
     j read_header_loop
 
 skip_comment:
-    # Skip lines starting with '#' (comments)
+    # SFunction to skip the comment line
     j read_header_loop
 
-header_done:
-    # Return to calling code
+header_exit:
     jr $ra
 
 read_pixel:
     # Read R, G, B values from the input file
-    li $v0, 14           # Service code for read string (from file descriptor)
-    move $a0, $s0        # Input file descriptor
-    la $a1, buffer       # Buffer to store the line
-    li $a2, 256          # Maximum line length
+    li $v0, 14           # Reads string
+    move $a0, $s0        
+    la $a1, buffer       # Stores line
+    li $a2, 256          # Max line length
     syscall
 
     # Parse the line for RGB values
-    li $t4, 0            # Initialize R value
-    li $t5, 0            # Initialize G value
-    li $t6, 0            # Initialize B value
-    li $t8, 0            # Initialize counter for digit position (0: R, 1: G, 2: B)
+    li $t4, 0            # Red value
+    li $t5, 0            # Green value
+    li $t6, 0            # Blue value
+    li $t8, 0            
+
 read_pixel_loop:
-    lb $t7, buffer($t8)  # Load a character from the buffer
-    beqz $t7, pixel_parsed  # If null terminator is reached, exit loop
+    lb $t7, buffer($t8)  # Loads character from buffer
+    #beqz $t7, pixel_runthrough 
 
-    # Convert the character to an integer and update the RGB value
-    sub $t7, $t7, 48     # Convert ASCII character to integer ('0' to 0, '1' to 1, etc.)
-    beq $t8, 0, update_r
-    beq $t8, 1, update_g
-    beq $t8, 2, update_b
+    sub $t7, $t7, 48     # Convert ascii character to int
+ # Updates values
+    beq $t8, 0, update_red	
+    beq $t8, 1, update_green
+    beq $t8, 2, update_blue
     j read_pixel_loop
 
-update_r:
-    mul $t4, $t4, 10     # Multiply current R value by 10
-    add $t4, $t4, $t7    # Add the new digit to R
+update_red:
+    mul $t4, $t4, 10     # Multiply by 10
+    add $t4, $t4, $t7    # Update
     j read_pixel_loop
 
-update_g:
-    mul $t5, $t5, 10     # Multiply current G value by 10
-    add $t5, $t5, $t7    # Add the new digit to G
+update_green:
+    mul $t5, $t5, 10     # Multiply by 10
+    add $t5, $t5, $t7    # Update
+
     j read_pixel_loop
 
-update_b:
-    mul $t6, $t6, 10     # Multiply current B value by 10
-    add $t6, $t6, $t7    # Add the new digit to B
+update_blue:
+    mul $t6, $t6, 10     # Multiply by 10
+    add $t6, $t6, $t7    # Updatr
     j read_pixel_loop
 
-pixel_parsed:
-    # Return to calling code
-    jr $ra
+#pixel_runthrough:
+#   jr $ra
 
 write_pixel:
     # Convert and format R, G, B values to a string
@@ -195,72 +184,63 @@ write_pixel:
     jal int_to_string
 
     # Write the formatted RGB string to the output file
-    move $a0, $s1        # Output file descriptor
-    move $a1, $t7        # Address of the RGB string
-    li $v0, 4            # Service code for print string (to file descriptor)
+    move $a0, $s1        
+    move $a1, $t7        # Stores RGB string
+
+    li $v0, 4            
     syscall
 
-    # Write a newline character to separate pixels
-    li $v0, 11           # Service code for print character
-    li $a0, 10           # ASCII code for newline character
+    # Newline to separate pixels
+    li $v0, 11           # Prints characters
+    li $a0, 10           
     syscall
 
-    # Return to calling code
     jr $ra
 
-# Function to convert an integer to a string
-# Expects integer in $a0, and stores the resulting string in $a1
+# Conversion of int to string
 int_to_string:
     # Initialize variables
-    li $t8, 10            # Base 10
-    move $t9, $a0         # Copy the integer to $t9
-    li $t0, 0             # Initialize string index
+    li $t8, 10            
+    move $t9, $a0         
+    li $t0, 0             
 
 int_to_string_loop:
-    # Calculate the remainder (digit) when dividing by 10
+    
     div $t9, $t8
-    mfhi $t1              # Remainder (digit) in $t1
+    mfhi $t1         # Remainder stored in $t1
 
-    # Convert the digit to ASCII and store it in the string
-    addi $t1, $t1, 48     # Convert digit to ASCII ('0' to 0, '1' to 1, etc.)
-    sb $t1, ($a1)         # Store the digit in the string
+    addi $t1, $t1, 48	# Convert to ascii     
+    sb $t1, ($a1)       # store in string
 
-    # Increment the string index
     addi $a1, $a1, 1
 
-    # Check if the quotient is zero (end of conversion)
-    beqz $t9, int_to_string_done
+    beqz $t9, int_to_string_exit
 
-    # Update the quotient for the next iteration
+    # Update for next loop
     move $t9, $t0
 
     j int_to_string_loop
 
-int_to_string_done:
-    # Null-terminate the string
+int_to_string_exit:
     li $t2, 0
     sb $t2, ($a1)
 
-    # Reverse the string in place
-    move $t3, $a1         # $t3 points to the end of the string
-    subi $t3, $t3, 1      # Point to the last character
+    # Reverse string in place
+    move $t3, $a1         
+    addi $t3, $t3, -1      
 
 int_to_string_reverse_loop:
-    # Swap characters at $t1 and $t3
+    # Reverses order of characters for display
     lb $t1, ($a1)
     lb $t4, ($t3)
     sb $t4, ($a1)
     sb $t1, ($t3)
 
-    # Move pointers inward
     addi $a1, $a1, 1
-    subi $t3, $t3, 1
+    addi $t3, $t3, -1
 
-    # Check if we've reached the middle of the string
-    beq $a1, $t3, int_to_string_reverse_done
-
+    beq $a1, $t3, int_to_string_reverse_exit	# Checks for middle of string
     j int_to_string_reverse_loop
 
-int_to_string_reverse_done:
-    # Return to calling code
+int_to_string_reverse_exit:
     jr $ra
